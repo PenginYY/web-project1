@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useLocalStorage } from 'react-use';
 import Sidebar from './Sidebar'
 import CarData from '../taladrod-cars.min.json'
 import Chart from 'chart.js/auto';
+
 
 function summarizeData(data) {
   const summary = {};
@@ -9,55 +11,123 @@ function summarizeData(data) {
   data.Cars.forEach((car) => {
     const brand = CarData.MMList.find(mm => mm.mkID === car.MkID)?.Name || 'Unknown';
     const model = car.Model;
-    const price = parseFloat(car.Prc.replace(/,/g, ''));
 
     if (!summary[brand]) {
-      summary[brand] = { totalCars: 0, totalValue: 0, models: {} };
+      summary[brand] = { totalCars: 0, models: {} };
     }
 
     if (!summary[brand].models[model]) {
-      summary[brand].models[model] = { count: 0, value: 0 };
+      summary[brand].models[model] = 0;
     }
 
     summary[brand].totalCars += 1;
-    summary[brand].totalValue += price;
-    summary[brand].models[model].count += 1;
-    summary[brand].models[model].value += price;
+    summary[brand].models[model] += 1;
   });
 
   return summary;
 }
 
-function SummaryTable({ data }) {
-  const summary = summarizeData(data);
+function CarTable({ data }) {
+  const [selectedCars, setSelectedCars] = useLocalStorage('selectedCars', []);
+
+  const handleRowClick = (index, car) => {
+    const isSelected = selectedCars.some(selectedCar => selectedCar.Cid === car.Cid);
+    if (isSelected) {
+      // Remove from selection
+      setSelectedCars(selectedCars.filter(selectedCar => selectedCar.Cid !== car.Cid));
+    } else {
+      // Add to selection
+      setSelectedCars([...selectedCars, {
+        Cid: car.Cid,
+        Model: car.Model,
+        NameMMT: car.NameMMT,
+        Prc: car.Prc,
+        Currency: car.Currency,
+        Yr: car.Yr,
+        Province: car.Province,
+        Img100: car.Img100
+      }]);
+    }
+  };
 
   return (
-    <div className="summary-table table-responsive-sm">
-      <table className="table table-hover table-sm">
-        <thead class="table-dark">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">#</th>
+          <th scope="col">Model</th>
+          <th scope="col">NameMMT</th>
+          <th scope="col">Price</th>
+          <th scope="col">Year</th>
+          <th scope="col">Province</th>
+          <th scope="col">Image</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.Cars.map((car, index) => (
+          <tr key={index} onClick={() => handleRowClick(index, car)} style={{ cursor: 'pointer' }}>
+            <th scope="row">
+              {selectedCars.some(selectedCar => selectedCar.Cid === car.Cid) ? (
+                <i className="bi bi-star-fill"></i> // Filled star for selected
+              ) : (
+                <i className="bi bi-star"></i> // Empty star for unselected
+              )}
+            </th>
+            <td>{car.Model}</td>
+            <td>{car.NameMMT}</td>
+            <td>{car.Prc} {car.Currency}</td>
+            <td>{car.Yr}</td>
+            <td>{car.Province}</td>
+            <td><img src={car.Img100} alt={car.Model} width="100" /></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+
+  )
+}
+
+function SummaryTable({ data }) {
+  const summary = summarizeData(data);
+  const [expandedRows, setExpandedRows] = useState({});
+
+  const toggleRow = (model) => {
+    setExpandedRows(prev => ({ ...prev, [model]: !prev[model] }));
+  };
+
+  return (
+    <div className="summary-table">
+      <table className="table table-hover">
+        <thead className="table-dark ">
           <tr>
             <th>Brand</th>
             <th>Model</th>
             <th>Number of Cars</th>
-            <th>Total Value (Baht)</th>
           </tr>
         </thead>
         <tbody>
-          {Object.entries(summary).map(([brand, brandData], index) => (
-            <React.Fragment key={index}>
-              <tr>
+          {Object.entries(summary).map(([brand, brandData]) => (
+            <React.Fragment key={brand}>
+              <tr className='table-info'>
                 <td>{brand}</td>
                 <td></td>
                 <td>{brandData.totalCars}</td>
-                <td>{brandData.totalValue.toLocaleString()}</td>
               </tr>
-              {Object.entries(brandData.models).map(([model, modelData], subIndex) => (
-                <tr key={subIndex}>
-                  <td></td>
-                  <td>{model}</td>
-                  <td>{modelData.count}</td>
-                  <td>{modelData.value.toLocaleString()}</td>
-                </tr>
+              {Object.entries(brandData.models).map(([model, modelData]) => (
+                <React.Fragment key={model}>
+                  <tr onClick={() => toggleRow(model)} style={{ cursor: 'pointer' }}>
+                    <td></td>
+                    <td>{model}<i className="bi bi-caret-down-fill m-2"></i></td>
+                    <td>{modelData}</td>
+                  </tr>
+                  {expandedRows[model] && (
+                    <tr>
+                      <td colSpan="4">
+                        <CarTable data={{ Cars: data.Cars.filter(car => car.Model === model) }} />
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </React.Fragment>
           ))}
@@ -67,15 +137,14 @@ function SummaryTable({ data }) {
   );
 }
 
+
+
 export default function Dashboard() {
 
   useEffect(() => {
     const summary = summarizeData(CarData);
     const brands = Object.keys(summary);
     const brandValues = brands.map(brand => summary[brand].totalCars);
-    const modelLabels = brands.flatMap(brand => 
-      Object.keys(summary[brand].models).map(model => `${brand} / ${model}`)
-    );
 
     const pieCtx = document.getElementById('pieChart').getContext('2d');
     const pieChart = new Chart(pieCtx, {
@@ -84,16 +153,16 @@ export default function Dashboard() {
         labels: brands,
         datasets: [{
           data: brandValues,
-          backgroundColor: ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000']
+          backgroundColor: brands.map((_, i) => `hsl(${i * 20}, 70%, 50%)`),
         }]
       },
       options: {
         responsive: true,
         plugins: {
           legend: {
-            position: 'right',
+            position: 'left',
             labels: {
-              boxWidth: 20,
+              boxWidth: 15,
               padding: 15
             }
           },
@@ -102,25 +171,38 @@ export default function Dashboard() {
     });
 
     const barCtx = document.getElementById('barChart').getContext('2d');
+
+    const data = {
+      labels: Object.keys(summary), // Model names from the first brand
+      datasets: Object.entries(summary).flatMap(([brand, brandData]) =>
+        Object.entries(brandData.models).map(([model, _]) => ({
+          label: model,
+          data: Object.keys(summary).map(b => summary[b].models[model] || 0),
+          backgroundColor: `hsl(${Math.random() * 360}, 70%, 50%)`, // Random color for each model
+        }))
+      )
+    };
+
+
     const barChart = new Chart(barCtx, {
       type: 'bar',
-      data: {
-        labels: modelLabels,
-        datasets: [{
-          label: 'Cars by Model',
-          data: brands.flatMap(brand => 
-            Object.values(summary[brand].models).map(modelData => modelData.count)
-          ),
-          backgroundColor: ['#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'],
-        }]
-      },
+      data: data,
       options: {
-        responsive: true,
         plugins: {
-          legend: {
-            position: 'top',
+          title: {
+            display: true,
+            text: 'Stacked Bar Chart'
           },
         },
+        responsive: true,
+        scales: {
+          x: {
+            stacked: true,
+          },
+          y: {
+            stacked: true
+          }
+        }
       },
     });
 
@@ -141,35 +223,29 @@ export default function Dashboard() {
           <div className='main-title'>
             <h3>DASHBOARD</h3>
           </div>
-          <div className='main-cards d-flex'>
+          <div className='main-cards'>
             <div className='card'>
-              <div className='card-inner'>
-                <h3>PRODUCTS TABLE</h3>
-                <SummaryTable data={CarData} />
+              <h3>PRODUCTS TABLE</h3>
+              <SummaryTable data={CarData} />
+            </div>
+            <div className='d-flex'>
+              <div className='card-pie card'>
+                <h3>PIE CHART</h3>
+                <canvas id='pieChart' width='400' height='400'></canvas>
+              </div>
+              <div className='card-bar card'>
+                <h3>BAR CHART</h3>
+                <canvas id='barChart' width='400' height='400'></canvas>
               </div>
             </div>
-
-            <div>
-              <div className='card'>
-                <div className='card-inner'>
-                  <h3>PIE CHART</h3>
-                  <canvas id='pieChart' width='400' height='400'></canvas>
-                </div>
-              </div>
-              <div className='card'>
-                <div className='card-inner'>
-                  <h3>BAR CHART</h3>
-                  <canvas id='barChart'></canvas>
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
     </>
-  )
+  );
 }
+
+
 
 /*
 A table showing Number of cars and values (in Baht) by brands and models 
@@ -185,35 +261,4 @@ Toyota = 200
 A Pie Chart showing portion of cars by brand. 
 
 A Stacked bar chart showing models of a brand in a bar. 
-*/
-
-
-/*
-function CarTable({ data }) {
-  return (
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">#</th>
-          <th scope="col">First</th>
-          <th scope="col">Last</th>
-          <th scope="col">Handle</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.Cars.map((car, index) => (
-          <tr key={index}>
-            <th scope="row">{index + 1}</th>
-            <td>{car.Model}</td>
-            <td>{car.NameMMT}</td>
-            <td>{car.Prc} {car.Currency}</td>
-            <td>{car.Yr}</td>
-            <td>{car.Province}</td>
-            <td><img src={car.Img100} alt={car.Model} width="100" /></td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
 */

@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom'
 export default function Sidebar() {
     return (
         <>
-            <div className="sidebar d-flex flex-column justify-content-between bg-dark text-white p-4 vh-100">
+            <div className="sidebar d-flex flex-column justify-content-between bg-dark text-white p-4 ">
                 <div>
-                    <Link to="/" className="d-flex align-items-center">
+                    <Link to="/car-market-analytics/" className="nav-link text-white">
                         <span className="fs-4">Car Market Analytics</span>
                     </Link>
                     <hr className="text-secondary mt-3" />
