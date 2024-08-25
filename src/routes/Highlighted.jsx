@@ -1,31 +1,17 @@
 import React from 'react'
+import { useLocalStorage } from 'react-use';
 import Sidebar from './Sidebar'
 
 
 export default function Highlighted() {
-    const [highlightedCars, setHighlightedCars] = useState([]);
+    const [selectedCars, setSelectedCars] = useLocalStorage('selectedCars', []);
 
-    // Load highlighted cars from local storage on component mount
-    useEffect(() => {
-        const storedCars = JSON.parse(localStorage.getItem('highlightedCars')) || [];
-        setHighlightedCars(storedCars);
-    }, []);
-
-    // Function to add a car to highlights
-    const selectCar = (car) => {
-        if (!highlightedCars.includes(car)) {
-            const updatedCars = [...highlightedCars, car];
-            setHighlightedCars(updatedCars);
-            localStorage.setItem('highlightedCars', JSON.stringify(updatedCars));
-        }
+    const removeCar = (cid) => {
+        setSelectedCars(selectedCars.filter(car => car.Cid !== cid));
     };
+    // Debugging: Log the selectedCars to check the available properties
+    console.log('Selected Cars:', JSON.stringify(selectedCars, null, 5));
 
-    // Function to remove a car from highlights
-    const removeCar = (car) => {
-        const updatedCars = highlightedCars.filter(item => item !== car);
-        setHighlightedCars(updatedCars);
-        localStorage.setItem('highlightedCars', JSON.stringify(updatedCars));
-    };
 
     return (
         <>
@@ -37,39 +23,43 @@ export default function Highlighted() {
                     <div className='main-title'>
                         <h3>HIGHLIGHTED CARS</h3>
                     </div>
-                    <div className='main-cards'>
-                        <div className='card'>
-                            <div className='card-inner'>
-                                <h3>HIGHLIGHTED CARS</h3>
-                                <ul>
-                                    {highlightedCars.map((car, index) => (
-                                        <li key={index}>
-                                            {car} 
-                                            <button onClick={() => removeCar(car)}>Remove</button>
-                                        </li>
+                    <div className='highlighted-cars'>
+                        {selectedCars && selectedCars.length > 0 ? (
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">Model</th>
+                                        <th scope="col">NameMMT</th>
+                                        <th scope="col">Price</th>
+                                        <th scope="col">Year</th>
+                                        <th scope="col">Province</th>
+                                        <th scope="col">Image</th>
+                                        <th scope="col">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedCars.map((car, index) => (
+                                        <tr key={index}>
+                                            <th scope="row">{index + 1}</th>
+                                            <td>{car.Model}</td>
+                                            <td>{car.NameMMT}</td>
+                                            <td>{car.Prc} {car.Currency}</td>
+                                            <td>{car.Yr}</td>
+                                            <td>{car.Province}</td>
+                                            <td><img src={car.Img100} alt={car.Model} width="100" /></td>
+                                            <td>
+                                                <button onClick={() => removeCar(car.Cid)} className="btn btn-danger">
+                                                    Remove
+                                                </button>
+                                            </td>
+                                        </tr>
                                     ))}
-                                </ul>
-                            </div>
-                        </div>
-                        <div className='card'>
-                            <div className='card-inner'>
-                                <h3>SELECT CARS</h3>
-                                <button onClick={() => selectCar('Toyota Camry')}>Highlight Toyota Camry</button>
-                                <button onClick={() => selectCar('Honda Accord')}>Highlight Honda Accord</button>
-                                {/* Add more buttons for different cars as needed */}
-                            </div>
-                        </div>
-                        <div className='card'>
-                            <div className='card-inner'>
-                                <h3>REMOVE CARS</h3>
-                                {/* Additional remove functionality can go here */}
-                            </div>
-                        </div>
-                        <div className='card'>
-                            <div className='card-inner'>
-                                <h3>On reload, the highlighted items persist.</h3>
-                            </div>
-                        </div>
+                                </tbody>
+                            </table>
+                        ) : (
+                            <p>No highlighted cars selected</p>
+                        )}
                     </div>
                 </div>
             </div>

@@ -16,7 +16,9 @@ const router = createBrowserRouter([
     path: "highlighted",
     element: <Highlighted />
   },
-]);
+], {
+  basename: "/car-market-analytics"  // This is the key change
+});
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
